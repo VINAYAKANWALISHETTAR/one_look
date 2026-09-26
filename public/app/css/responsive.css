@@ -1,0 +1,106 @@
+/* One Look — responsive. Mobile-first (360–430px), then tablet, then desktop. */
+
+/* Slightly wider time gutter once there is room for it. */
+@media (min-width: 380px) {
+  .list-row .time {
+    min-width: 70px;
+  }
+}
+
+/* Tablet — more breathing room, four shortcut columns. */
+@media (min-width: 600px) {
+  :root {
+    --card-pad: var(--sp-5);
+  }
+
+  .screen {
+    padding: calc(var(--sp-6) + env(safe-area-inset-top)) var(--sp-5) var(--sp-7);
+  }
+
+  .shortcut-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+/* Desktop / large tablets — side rail instead of a bottom tab bar. */
+@media (min-width: 900px) {
+  :root {
+    --tab-h: 0px;
+  }
+
+  .app-view {
+    display: grid;
+    grid-template-columns: 232px minmax(0, 1fr);
+    min-height: 100vh;
+    padding-bottom: 0;
+  }
+
+  .screen {
+    grid-column: 2;
+    width: 100%;
+    max-width: 680px;
+    padding: var(--sp-7) var(--sp-6);
+  }
+
+  .tabbar {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    grid-column: 1;
+    grid-row: 1;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: var(--sp-1);
+    padding: var(--sp-6) var(--sp-3);
+    border-top: 0;
+    border-right: 1px solid var(--line);
+    backdrop-filter: none;
+    background: var(--bg);
+  }
+
+  .tab {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--sp-3);
+    font-size: var(--fs-md);
+    padding: 9px var(--sp-3);
+    border-radius: var(--r-sm);
+  }
+
+  .tab[data-active="true"] {
+    background: var(--surface-2);
+    font-weight: 600;
+  }
+
+  /* Desktop uses the inline "+ Add" action instead of a floating button. */
+  .fab {
+    display: none;
+  }
+
+  .add-inline {
+    display: inline-flex;
+  }
+
+  .sheet-backdrop {
+    align-items: center;
+  }
+
+  .sheet {
+    border-radius: var(--r-lg);
+    max-width: 520px;
+    padding-bottom: var(--sp-5);
+  }
+
+  .toast-root {
+    bottom: var(--sp-5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

@@ -1,0 +1,236 @@
+/* One Look — foundations: tokens, one typography scale, layout primitives.
+ *
+ * Dark first. Themes are driven by <html data-theme="dark|light|system">, set by
+ * js/modules/theme.js, so no component ever needs a colour literal.
+ */
+
+:root {
+  /* Spacing — one 4px scale, used everywhere. */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 28px;
+  --sp-7: 40px;
+
+  /* Card language — one radius set, one hairline, one shadow. */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --card-pad: var(--sp-4);
+  --row-pad-y: 13px;
+
+  /* Typography — three sizes plus two utility sizes. Nothing else. */
+  --fs-title: 21px;
+  --fs-lg: 17px;
+  --fs-md: 15px;
+  --fs-sm: 13px;
+  --fs-xs: 11.5px;
+
+  --tab-h: 58px;
+  --font:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --dur: 0.16s;
+  --ease: cubic-bezier(0.2, 0.6, 0.3, 1);
+}
+
+/* ---------- Dark palette (default) ---------- */
+:root,
+:root[data-theme="dark"] {
+  --bg: #0b0c0f;
+  --bg-sunken: #101216;
+  --surface: #14161b;
+  --surface-2: #191c22;
+  --text: #eef0f3;
+  --text-muted: #9aa1ac;
+  --text-faint: #6f7681;
+  --line: #232730;
+  --line-strong: #2e333d;
+  --accent: #6ea8ff;
+  --accent-soft: #17202e;
+  --high: #e8736f;
+  --medium: #d9a74a;
+  --low: #6fb08f;
+  --done: #6a7078;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+}
+
+/* ---------- Light palette ---------- */
+:root[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-sunken: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f4f5f7;
+  --text: #14161a;
+  --text-muted: #6b7280;
+  --text-faint: #9aa0a8;
+  --line: #e7e8ec;
+  --line-strong: #d6d8de;
+  --accent: #1f6feb;
+  --accent-soft: #eef4ff;
+  --high: #d64545;
+  --medium: #b7801a;
+  --low: #48876c;
+  --done: #8b9099;
+  --shadow: 0 1px 2px rgb(16 18 22 / 0.06);
+}
+
+/* "Match system" resolves in CSS so there is no flash and no JS listener. */
+@media (prefers-color-scheme: light) {
+  :root[data-theme="system"] {
+    --bg: #ffffff;
+    --bg-sunken: #f6f7f9;
+    --surface: #ffffff;
+    --surface-2: #f4f5f7;
+    --text: #14161a;
+    --text-muted: #6b7280;
+    --text-faint: #9aa0a8;
+    --line: #e7e8ec;
+    --line-strong: #d6d8de;
+    --accent: #1f6feb;
+    --accent-soft: #eef4ff;
+    --high: #d64545;
+    --medium: #b7801a;
+    --low: #48876c;
+    --done: #8b9099;
+    --shadow: 0 1px 2px rgb(16 18 22 / 0.06);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: var(--fs-md);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* ---------- Layout primitives ---------- */
+.app-view {
+  min-height: 100vh;
+  padding-bottom: calc(var(--tab-h) + env(safe-area-inset-bottom));
+}
+
+.screen {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: calc(var(--sp-5) + env(safe-area-inset-top)) var(--sp-4) var(--sp-7);
+  outline: none;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.spread {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- Typography scale ---------- */
+.page-title {
+  font-size: var(--fs-title);
+  font-weight: 640;
+  letter-spacing: -0.018em;
+}
+
+.page-sub {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.section-label {
+  font-size: var(--fs-xs);
+  font-weight: 640;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.faint {
+  color: var(--text-faint);
+}
+
+.small {
+  font-size: var(--fs-sm);
+}
+
+.tiny {
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
