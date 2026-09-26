@@ -6,19 +6,17 @@
  * there is nothing else to keep in sync.
  *
  * This module owns the scheduling loop and hands every due reminder to the
- * Notification Center, which records it and delivers the browser notification.
+ * Notification Center, which records it and delivers the notification.
  *
- * Legacy note: the loop It polls IndexedDB every 30s (and on
- * tab focus) and hands anything due to modules/notifications.js. Delivered keys
- * live in the `settings` store so a refresh never re-fires the same reminder.
- *
- * Foreground only. Background delivery = PWA/service-worker phase.
+ * On native (Capacitor): schedules LocalNotifications for background delivery.
+ * On web: uses browser Notification API (foreground only).
  */
 
 import { listTasks } from "./tasks.js";
 import { STORES, readValue, writeValue } from "../db/indexeddb.js";
 import { formatTime } from "./format.js";
 import * as center from "./notification-center.js";
+import { scheduleNotification, cancelNotification } from "./notifications.js";
 
 const DELIVERED_KEY = "remindersDelivered";
 const TICK_MS = 30000;
@@ -26,6 +24,7 @@ const TICK_MS = 30000;
 const GRACE_MS = 60 * 60 * 1000;
 
 let timer = null;
+let nativeScheduled = new Set();
 
 export function reminderKey(task) {
   return `${task.id}@${task.reminderAt}`;
@@ -73,6 +72,52 @@ export function reminderBody(task, now = new Date()) {
   return `Was due at ${formatTime(task.time)}`;
 }
 
+/** Schedule native local notifications for all upcoming reminders. */
+export async function scheduleAllReminders() {
+  const bridge = await import('./notifications.js').then(m => m.getNativeBridge?.());
+  if (!bridge) return; // Web: rely on tick()
+
+  const upcoming = await upcomingReminders();
+  const now = new Date();
+
+  // Clear old scheduled notifications for this app
+  await cancelAllNotifications();
+
+  for (const task of upcoming) {
+    const reminderAt = new Date(task.reminderAt);
+    if (reminderAt <= now) continue; // Already due, will be handled by tick()
+
+    const key = reminderKey(task);
+    if (nativeScheduled.has(key)) continue;
+
+    try {
+      await scheduleNotification({
+        id: key,
+        title: task.title,
+        body: reminderBody(task, reminderAt),
+        at: reminderAt,
+        channelId: 'onelook-reminders',
+        extra: { taskId: task.id, route: '/tasks', reminderKey: key },
+        actions: [
+          { id: 'OPEN_APP', title: 'Open' },
+          { id: 'snooze', title: 'Snooze 10m', extra: { snoozeMinutes: 10 } },
+          { id: 'dismiss', title: 'Dismiss', destructive: true },
+        ],
+      });
+      nativeScheduled.add(key);
+    } catch (error) {
+      console.error('[OneLook] Failed to schedule reminder:', task.id, error);
+    }
+  }
+}
+
+/** Cancel a specific reminder's native notification. */
+export async function cancelReminder(task) {
+  const key = reminderKey(task);
+  nativeScheduled.delete(key);
+  await cancelNotification(key);
+}
+
 export async function tick(now = new Date()) {
   const seen = await delivered();
   const due = (await dueReminders(now)).filter((task) => !seen.includes(reminderKey(task)));
@@ -87,8 +132,7 @@ export async function tick(now = new Date()) {
       skipped.push(reminderKey(task));
       continue;
     }
-    // The Notification Center records the alert (so it has a history even when
-    // notifications are off) and delivers the browser notification itself.
+    // Record in notification center and deliver notification
     const recorded = await center.add({
       type: "task",
       title: task.title,
@@ -100,17 +144,21 @@ export async function tick(now = new Date()) {
   }
 
   await markDelivered([...skipped, ...fired.map(reminderKey)]);
+
+  // Re-schedule native notifications for remaining upcoming reminders
+  await scheduleAllReminders();
+
   return fired;
 }
-
 
 function onVisible() {
   if (!document.hidden) tick().catch(() => {});
 }
 
-export function start() {
+export async function start() {
   stop();
-  tick().catch(() => {});
+  await tick().catch(() => {});
+  await scheduleAllReminders().catch(() => {});
   timer = window.setInterval(() => tick().catch(() => {}), TICK_MS);
   document.addEventListener("visibilitychange", onVisible);
 }

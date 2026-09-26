@@ -1426,6 +1426,15 @@ async function showApp(session) {
   reminders.start();
   hub.start();
   sync.start();
+
+  // Initialize native notifications (Capacitor) for background delivery
+  try {
+    const { initNotifications } = await import('./services/capacitor-notifications.js');
+    await initNotifications();
+  } catch (error) {
+    console.debug('[OneLook] Native notifications not available:', error?.message);
+  }
+
   await router.resolve();
 }
 

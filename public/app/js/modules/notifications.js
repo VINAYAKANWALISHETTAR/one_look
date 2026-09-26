@@ -1,35 +1,58 @@
 /**
- * Browser notification permission + delivery.
+ * Unified Notifications — works on Web (browser Notification API) and Native (Capacitor LocalNotifications).
  *
- * Single owner of the Notification API. Permission is ONLY requested from an
- * explicit user gesture (the "Enable notifications" button). Once the browser
- * reports "denied" we never ask again — the browser would ignore it anyway and
- * repeated prompts are hostile.
- *
- * Foreground only: notifications fire while One Look is open in a tab.
- * Background delivery needs a service worker and is a later phase.
+ * Single API for both platforms. On native Android, uses Capacitor for background delivery.
+ * On web, uses browser Notification API (foreground only).
  */
 
+import { Capacitor } from '@capacitor/core';
 import { STORES, writeValue } from "../db/indexeddb.js";
 
+const IS_NATIVE = Capacitor.isNativePlatform();
 const ASKED_KEY = "notificationsAsked";
 
+let nativeBridge = null;
+
+/** Initialize native bridge if available. */
+async function getNativeBridge() {
+  if (!IS_NATIVE) return null;
+  if (nativeBridge) return nativeBridge;
+  try {
+    const mod = await import('../services/capacitor-notifications.js');
+    nativeBridge = mod;
+    await mod.initNotifications();
+    return nativeBridge;
+  } catch (error) {
+    console.warn('[OneLook] Native bridge unavailable:', error);
+    return null;
+  }
+}
+
 /** granted | denied | default | unsupported */
-export function status() {
+export async function status() {
+  const bridge = await getNativeBridge();
+  if (bridge) {
+    const perm = await bridge.areNotificationsAvailable();
+    return perm ? 'granted' : 'denied';
+  }
   if (!("Notification" in window)) return "unsupported";
   return Notification.permission;
 }
 
 export function isSupported() {
-  return "Notification" in window;
+  return IS_NATIVE || "Notification" in window;
 }
 
-export function canNotify() {
-  return status() === "granted";
+export async function canNotify() {
+  return (await status()) === "granted";
 }
 
 /** Must be called from a click handler. */
 export async function requestPermission() {
+  const bridge = await getNativeBridge();
+  if (bridge) {
+    return bridge.requestNotificationPermission();
+  }
   if (!isSupported()) return "unsupported";
   if (Notification.permission !== "default") return Notification.permission;
   await writeValue(STORES.settings, ASKED_KEY, true);
@@ -41,26 +64,64 @@ export async function requestPermission() {
 }
 
 /** Fires a notification. Returns true only when it actually went out. */
-export function notify(title, { body = "", tag, icon = "/app/assets/icons/icon-192.png" } = {}) {
-  if (!canNotify()) return false;
+export async function notify(title, { body = "", tag, icon = "/app/assets/icons/icon-192.png" } = {}) {
+  const bridge = await getNativeBridge();
+  if (bridge) {
+    try {
+      await bridge.scheduleLocalNotification({
+        id: tag || `notif-${Date.now()}`,
+        title,
+        body,
+        at: new Date(), // immediate
+        channelId: 'onelook-general',
+        extra: { tag },
+      });
+      return true;
+    } catch (error) {
+      console.error('[OneLook] Native notify failed:', error);
+      return false;
+    }
+  }
+
+  // Web fallback
+  if (!(await canNotify())) return false;
   try {
     new Notification(title, { body, tag, icon });
     return true;
   } catch {
-    // Some mobile browsers only allow notifications through a service worker.
     return false;
   }
 }
 
-export function statusLabel(state = status()) {
-  switch (state) {
-    case "granted":
-      return "On — reminders appear while One Look is open";
-    case "denied":
-      return "Turned off in your browser settings";
-    case "unsupported":
-      return "This browser cannot show notifications";
-    default:
-      return "Not enabled yet";
+/** Schedule a notification for a specific time (for reminders). */
+export async function scheduleNotification({ id, title, body, at, channelId = 'onelook-reminders', extra = {}, actions }) {
+  const bridge = await getNativeBridge();
+  if (bridge) {
+    return bridge.scheduleLocalNotification({ id, title, body, at, channelId, extra, actions });
   }
+  // Web: can't schedule future notifications without service worker
+  console.warn('[OneLook] Web cannot schedule future notifications; use native build');
+  return null;
+}
+
+/** Cancel a scheduled notification. */
+export async function cancelNotification(id) {
+  const bridge = await getNativeBridge();
+  if (bridge) return bridge.cancelNotification(id);
+}
+
+/** Cancel all scheduled notifications. */
+export async function cancelAllNotifications() {
+  const bridge = await getNativeBridge();
+  if (bridge) return bridge.cancelAllNotifications();
+}
+
+export function statusLabel(state) {
+  const labels = {
+    granted: "On — reminders appear even when app is closed",
+    denied: "Turned off in your device settings",
+    unsupported: "This device cannot show notifications",
+    default: "Not enabled yet",
+  };
+  return labels[state] || labels.default;
 }

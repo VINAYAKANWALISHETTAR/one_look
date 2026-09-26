@@ -17,6 +17,7 @@
 
 import { STORES, getAll, get, put, remove, uid } from "../db/indexeddb.js";
 import { todayISO, toDateTime, formatTime } from "./format.js";
+import { scheduleAllReminders, cancelReminder } from "./reminders.js";
 
 export const PRIORITIES = ["high", "medium", "low"];
 export const FILTERS = ["today", "upcoming", "overdue", "completed", "all"];
@@ -150,6 +151,7 @@ export async function createTask(input) {
     syncStatus: "pending",
   };
   await put(STORES.tasks, task);
+  await scheduleAllReminders().catch(() => {});
   return decorate(task);
 }
 
@@ -165,6 +167,7 @@ export async function updateTask(id, input) {
     syncStatus: "pending",
   };
   await put(STORES.tasks, task);
+  await scheduleAllReminders().catch(() => {});
   return decorate(task);
 }
 
